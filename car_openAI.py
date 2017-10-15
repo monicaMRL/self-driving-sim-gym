@@ -18,7 +18,7 @@ from scipy.spatial.distance import euclidean as point_dist
 
 WIDTH = 500
 HEIGHT = 500
-FPS = 40
+FPS = 15
 
 lastAngle = 0
 
@@ -44,7 +44,7 @@ class Lane(object):
 
         self.lane_rect = pygame.draw.polygon(displaySurface, self.color, self.vertices)        
         
-        self._markerWidth = 6
+        self._markerWidth = 10
         self._markerLen = 50
         self._markerGap = 30
         self._markerNum = HEIGHT / (self._markerLen + self._markerGap)
@@ -87,11 +87,14 @@ class Lane(object):
         new_obj = list()
         
         for m in self.markerList:
-            o = m.move(vel[0], -1 * vel[1])
+            o = m.move(vel[0], vel[1])
             
             if o.top > HEIGHT:
                 o.top = o.top % HEIGHT
-                
+
+            elif o.top < 0:
+                o.top = HEIGHT
+
             new_obj.append(o)
             
         self.markerList = new_obj
@@ -115,7 +118,9 @@ class Obstacles(object):
     def move(self,speed,heading):
         
         self.speed = speed
-        self.heading = heading
+
+        if not heading > 90:
+        	self.heading = heading 
         
         y = self.speed * math.cos(math.radians(self.heading))
         x = self.speed * math.sin(math.radians(self.heading))
@@ -135,10 +140,20 @@ class Obstacles(object):
 class Agent(Obstacles):
     def __init__(self,image_name,position,angle,init_speed):
         super(self.__class__, self).__init__(image_name,position,angle,init_speed)
+        self.img = pygame.transform.scale(self.img,(45,45))
+        self.mutable_img = self.img.copy()
+        
+        self.boundingBox = self.img.get_rect()
+        self.boundingBox.center = position
+        self.mutable_bb = copy.deepcopy(self.boundingBox)
+        
+        
         
     def move(self,speed,heading):
         self.speed = speed
-        self.heading = heading
+
+        if not heading > 90:
+        	self.heading = heading
         
         y = 0
         x = self.speed * math.sin(math.radians(self.heading))
@@ -153,15 +168,16 @@ class Agent(Obstacles):
         self.mutable_bb.move_ip([x,y])
    
 #----------------------- Class variables for enviroment -------------------------
-l1 = Lane([100,0],50,1)
-l2 = Lane([150,0],50,2)
-l3 = Lane([200,0],50,3)
-l4 = Lane([250,0],50,4)
+l1 = Lane([50,0],100,1)
+l2 = Lane([150,0],100,2)
+l3 = Lane([250,0],100,3)
+l4 = Lane([350,0],100,4)
+
 lane_list = [l1,l2,l3,l4]
 
-robot = Agent('car1.png',[230,HEIGHT-30],0,6)
+robot = Agent('car_ver.png',[225,HEIGHT-30],0,6)
 
-o1 = Obstacles('car2.png',[230,130],180,5)
+o1 = Obstacles('car2.png',[225,130],180,5)
 
 obj_list = [o1]
 
@@ -207,7 +223,7 @@ class Environment(object):
         pygame.display.update()
         
     def check_collision(self):
-    	print "Inside collision checker \n"
+    	
         rect_list = list()
         
         for o in self.obj_list:
@@ -223,83 +239,130 @@ class Environment(object):
         return collision
         
     def in_laneNumber(self):
+
         for l in self.lane_list:
+        	#print l.lane_rect.left, self.
         	test_result = l.lane_rect.contains(self.agent.mutable_bb)
         	#print test_result
         	if test_result == True:
         		return l.number
         return None
+
+    def in_laneNumGen(self,rect):
+
+        for l in self.lane_list:
+        	#print l.lane_rect.left, self.
+        	test_result = l.lane_rect.contains(rect)
+        	#print test_result
+        	if test_result == True:
+        		return l.number
+        return None
+
+    def off_road(self):
+    	
+    	off_roadFlag = False
+
+    	agent_right = self.agent.mutable_bb.right
+    	agent_left = self.agent.mutable_bb.left
+    	rightMost = self.lane_list[-1].lane_rect.right
+    	leftMost = self.lane_list[-0].lane_rect.left
+    
+
+    	if agent_right > rightMost or agent_left < leftMost:
+    		off_roadFlag = True
+    	
+    
+    	return off_roadFlag
+
+
+
+    def reset(self):
+    	self.agent.mutable_bb.center = self.agent.boundingBox.center
+    	self.agent.heading = 0
+    	self.agent.speed = 6
+
+    	o1.mutable_bb.center = o1.boundingBox.center
+    	o1.heading = 180
+    	o1.speed = 5
+
+
         
-            
     def step(self,action):
         """
         action is list with acceleration and steering angle
         """
+        # next_speed, next_heading, lane_angle, lane_number, off_road, opp_laneNum, opp_dist 
+        observation = list()
+        done = False
+
         acc = action[0] * self.maxAcc
         steerAngle = action[1] * self.maxAngle
         
         self.agent.speed += acc
-        self.agent.heading += steerAngle        
-        
-        print self.agent.heading
-        print self.in_laneNumber()
-
-        
-    def step_visual(self):
-        
-        for l in lane_list:
-            l.relative_move([0,-self.agent.speed])
-            
-        o1.move(o1.speed,math.pi)
-        
-        self.agent.move(self.agent.speed,self.agent.heading)
+        self.agent.heading += steerAngle  
+        self.agent.heading = self.agent.heading % 360
     
-        if o1.mutable_bb.center[1] > HEIGHT:
-            o1.mutable_bb.center = [o1.mutable_bb.center[0],o1.mutable_bb.center[1] % HEIGHT]
-        
-        elif o1.mutable_bb.center[1] < 0:
-            o1.mutable_bb.center = [o1.mutable_bb.center[0],HEIGHT]
+        observation.append(self.agent.speed)
+        observation.append(self.agent.heading)
+        observation.append(self.agent.heading)
 
-        if self.check_collision():
-        	print "CRASSSSSSSHHHHHHHHH"
+        lane_number = self.in_laneNumber()
+        if not lane_number == None:
+            observation.append(lane_number)
+        else:
+            observation.append(-1)
 
- 
-        self._renderObj()
-        mainClock.tick(FPS)
-        
-        
-if __name__ == '__main__':
-    env = Environment(lane_list,obj_list,robot)
-    gameExit = False
-    init_acc = 0
-    init_steer = 0
-    
-    while not gameExit:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                gameExit == True
+        off_roadFlag = self.off_road()
+
+        if off_roadFlag:
+            done = True
+            observation.append(1)
+        else:
+            done = False
+            observation.append(0)
+
+        for on in self.obj_list:
+            o_rect = on.mutable_bb
+            o_laneNum = self.in_laneNumGen(o_rect)
+            if not o_laneNum == None:
+                observation.append(o_laneNum)
+            else:
+                observation.append(-100)
                 
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_LEFT:
-                    init_steer = - 0.1
-                elif event.key == pygame.K_RIGHT:                    
-                    init_steer = 0.1
-                elif event.key == pygame.K_UP:                    
-                    init_acc = 0.1
-                elif event.key == pygame.K_DOWN:
-                    init_acc = - 0.1
-                else:
-                    print "No keys"
-                    curr_action = None
-    
-                env.step([init_acc,init_steer])
+        for od in self.obj_list:
+            o_rect = od.mutable_bb
+            
+            if not o_rect.center[1] > HEIGHT or o_rect.center[1] < 0:
+                o_dist = point_dist(np.array(self.agent.mutable_bb.center),np.array(o_rect.center))
+                observation.append(o_dist)
+            else:
+                observation.append(999)
 
-        env.step_visual()        
-        mainClock.tick(FPS)
+
+        if self.agent.heading > 90 or self.agent.heading < -90:
+            for l in lane_list:
+                l.relative_move([0,-self.agent.speed])
+        else:
+            for l in lane_list:
+                l.relative_move([0,self.agent.speed])
+
+        self.agent.move(self.agent.speed,self.agent.heading)
+            
+        for o in self.obj_list:
+            o.move(o1.speed,math.pi)
+            if o.mutable_bb.center[1] > HEIGHT:
+                o.mutable_bb.center = [o.mutable_bb.center[0],o.mutable_bb.center[1] % HEIGHT]
+            elif o.mutable_bb.center[1] < 0:
+                o.mutable_bb.center = [o.mutable_bb.center[0],HEIGHT]
+                
+        collision_flag = self.check_collision()
         
-    pygame.quit()
-    quit()
-    
-    
-    
-    
+        if collision_flag:
+            done = True
+       
+        self._renderObj()
+
+        return [self.agent.speed,self.agent.heading],observation, done
+       
+        
+  

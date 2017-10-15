@@ -8,30 +8,41 @@ Created on Tue Aug 15 03:36:29 2017
 from car_openAI import *
 
 
-speed = 3
-actionSet = {'up':[0,-1*speed],'dw':[0,1*speed],'lf':[-1*speed,0],'rt':[1*speed,0]}
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     env = Environment(lane_list,obj_list,robot)
     gameExit = False
+    init_acc = 0
+    init_steer = 0
     
     while not gameExit:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 gameExit == True
-        env.step(None)
-#            if event.type == pygame.KEYDOWN:
-#                if event.key == pygame.K_LEFT:                    
-#                    env.step(actionSet['lf'])
-#                elif event.key == pygame.K_RIGHT:                    
-#                    env.step(actionSet['rt'])
-#                elif event.key == pygame.K_UP:                    
-#                    env.step(actionSet['up'])
-#                elif event.key == pygame.K_DOWN:
-#                    env.step(actionSet['dw'])
-#                else:
-#                    print "No keys"
                 
-        
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT:
+                    init_steer -=  0.1
+                elif event.key == pygame.K_RIGHT:                    
+                    init_steer += 0.1
+                elif event.key == pygame.K_UP:                    
+                    init_acc += 0.1
+                elif event.key == pygame.K_DOWN:
+                    init_acc -=  0.1
+                else:
+                    print "No keys"
+                    init_acc = 0
+                    init_steer = 0
+
+    		print "-----------------",init_acc, init_steer
+
+        next_state,observation,done = env.step([init_acc,init_steer])
+        if done:
+            env.reset()
+
+        print observation
+    	
+    	mainClock.tick(FPS)    
+
     pygame.quit()
     quit()
+    

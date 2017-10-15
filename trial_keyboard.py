@@ -21,25 +21,25 @@ if __name__ == '__main__':
                 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    init_steer -=  0.1
+                    init_steer -=  0.01
                 elif event.key == pygame.K_RIGHT:                    
-                    init_steer += 0.1
+                    init_steer += 0.01
                 elif event.key == pygame.K_UP:                    
-                    init_acc += 0.1
+                    init_acc += 0.01
                 elif event.key == pygame.K_DOWN:
-                    init_acc -=  0.1
+                    init_acc -=  0.01
                 else:
                     print "No keys"
                     init_acc = 0
                     init_steer = 0
 
-    		print "-----------------",init_acc, init_steer
-
         next_state,observation,done = env.step([init_acc,init_steer])
         if done:
+            init_acc = 0
+            init_steer = 0
             env.reset()
 
-        print observation
+        print init_acc, init_steer, observation
     	
     	mainClock.tick(FPS)    
 

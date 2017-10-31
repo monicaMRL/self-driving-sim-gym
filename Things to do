@@ -1,0 +1,9 @@
+1. Add auto and joystick mode and program an interchange between them.
+
+2. Add stochasticity in enviroment. (For given action car changes the state according to some noise)
+	While adding stochasticity, it should be added to actuators or observations? --> Gaussian Noise??
+
+3. Make stochastic policy return probability distribution over actions and how confident it is on that distribution?
+
+--> actual changes given by driver is very few than data collected.
+--> There is no idea of episode or goal in this setup. Will that be necessary?

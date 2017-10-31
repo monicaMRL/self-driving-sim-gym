@@ -13,6 +13,7 @@ import math
 import time
 import copy
 from scipy.spatial.distance import euclidean as point_dist
+import random
 
 #------------------- Global Variables ------------------------------------------------------------------
 
@@ -116,6 +117,19 @@ class Obstacles(object):
         self.heading = angle
         self.last_heading = 0
         
+        
+    def appear_random(self,flag):
+        if flag == 'p':
+            opp_P = [[275,0],[180,0],[130,0],[400,0]]
+        else:
+            opp_P = [[275,HEIGHT],[180,HEIGHT],[130,HEIGHT],[400,HEIGHT]]
+            
+        random_in = random.randint(0,len(opp_P)-1)
+        
+        return opp_P[random_in]
+        
+        
+        
     def move(self,speed,heading):
         
         self.speed = speed
@@ -176,23 +190,35 @@ l4 = Lane([350,0],100,4)
 
 lane_list = [l1,l2,l3,l4]
 
-agent_initP = [180,HEIGHT-30]
+agent_initP = [180,HEIGHT-100]
 agent_initA = 20
 agent_initS = 8
 robot = Agent('car_ver.png',agent_initP,agent_initA,agent_initS)
 
-opp1_P = [275,130]
-opp1_A = 180
-opp1_S = -1
+opp_P = [[275,0],[180,0],[130,0],[400,0]]
 
-opp2_P = [180,130]
+opp1_P = [275,130]
+opp1_A = 0
+opp1_S = 3
+
+opp2_P = [400,130]
 opp2_A = 0
 opp2_S = 2
 
+opp3_P = [130,130]
+opp3_A = 0
+opp3_S = 2
+
+opp4_P = [180,130]
+opp4_A = 0
+opp4_S = 2
+
 o1 = Obstacles('opp_ver.png',opp1_P,opp1_A,opp1_S)
 o2 = Obstacles('opp_g.png',opp2_P,opp2_A,opp2_S)
+o3 = Obstacles('opp_g.png',opp3_P,opp3_A,opp3_S)
+o4 = Obstacles('opp_ver.png',opp4_P,opp4_A,opp4_S)
 
-obj_list = [o1,o2]
+obj_list = [o1,o2,o3,o4]
 
 #---------------------- Environment----------------------------------------------
 
@@ -253,8 +279,10 @@ class Environment(object):
         
     def in_laneNumber(self):
         for l in self.lane_list:
-         test_result = l.lane_rect.contains(self.agent.mutable_bb)
-         if test_result == True:
+#         test_result = l.lane_rect.contains(self.agent.mutable_bb)
+         test_result = l.lane_rect.collidepoint(self.agent.mutable_bb.center)
+         
+         if test_result:
              dist = l.lane_rect.center[0] - self.agent.mutable_bb.center[0]
              number = l.number
              return number, -dist
@@ -319,8 +347,13 @@ class Environment(object):
         acc = round(action[0],4) * self.maxAcc
         steerAngle = round(action[1],4) * self.maxAngle
         
+        old_speed = self.agent.speed
+        
         self.agent.speed += acc
-        self.agent.heading += steerAngle  
+        self.agent.heading += steerAngle
+        
+        if self.agent.speed < 0:
+            self.agent.speed = old_speed
         
         if self.agent.heading > 0:
             self.agent.heading = self.agent.heading % 360
@@ -332,8 +365,9 @@ class Environment(object):
         observation.append(round(self.agent.heading,3))
 
         _ = self.in_laneNumber()
+        
         if not _ == None:
-            lane_number,dist_center = self.in_laneNumber()
+            lane_number,dist_center = _#self.in_laneNumber()
             observation.append(lane_number)
             #observation.append(dist_center)
         else:
@@ -381,15 +415,20 @@ class Environment(object):
         self.agent.move(self.agent.speed,self.agent.heading)
             
         for o in self.obj_list:
-            if o.speed-self.agent.speed < 0:
-                o.move(o.speed,180)
-            else:
-                o.move(o.speed,0)
+            old_ospeed = o.speed
+            o.speed += acc
+            if o.speed < 0:
+                o.speed = old_ospeed
+            #if o.speed-self.agent.speed < 0:
+                #o.move(o.speed,180)
+            #else:
+                #o.move(o.speed,0)
+            o.move(o.speed,0)
                 
             if o.mutable_bb.center[1] > HEIGHT:
-                o.mutable_bb.center = [o.mutable_bb.center[0],o.mutable_bb.center[1] % HEIGHT]
+                o.mutable_bb.center = o.appear_random('p')#[o.mutable_bb.center[0],o.mutable_bb.center[1] % HEIGHT]
             elif o.mutable_bb.center[1] < 0:
-                o.mutable_bb.center = [o.mutable_bb.center[0],HEIGHT]
+                o.mutable_bb.center = o.appear_random('n')
                 
         collision_flag = self.check_collision()
         
